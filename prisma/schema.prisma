@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Stage {
+  PROSPECTING
+  QUALIFICATION
+  DISCOVERY
+  POC
+  BUSINESS_CASE
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum ActivityType {
+  EMAIL
+  LINKEDIN
+  CALL
+  MEETING
+  DEMO
+  INTERNAL
+  OTHER
+}
+
+enum Outcome {
+  NO_RESPONSE
+  BOUNCED
+  ENGAGED
+  MEETING_SET
+  MEETING_HELD
+  ADVANCED_STAGE
+  STALLED
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum ArtifactType {
+  ACCOUNT_BRIEF
+  OUTREACH_PACK
+  FOLLOWUP
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+enum TaskSource {
+  AI
+  MANUAL
+}
+
+enum ProductFocus {
+  MTD
+  MAPS
+  BOTH
+}
+
+model User {
+  id          String       @id
+  email       String       @unique
+  name        String?
+  accounts    Account[]
+  activities  Activity[]
+  artifacts   AIArtifact[]
+  contacts    Contact[]
+  settings    UserSettings?
+  tasks       Task[]
+  events      EventLog[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model UserSettings {
+  id                  String       @id @default(uuid())
+  userId              String       @unique
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultTone         String       @default("Direct")
+  defaultProductFocus ProductFocus @default(BOTH)
+  defaultCTA          String       @default("15–20 min call, Tue/Wed options")
+  signatureBlock      String       @default("")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model Account {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountName  String
+  domain       String?
+  industry     String?
+  region       String?
+  stage        Stage       @default(PROSPECTING)
+  knownTools   String?
+  initiatives  String?
+  notes        String?
+  tags         String[]
+  contacts     Contact[]
+  activities   Activity[]
+  artifacts    AIArtifact[]
+  tasks        Task[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId, stage])
+  @@index([userId, updatedAt])
+}
+
+model Contact {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name        String
+  title       String?
+  persona     String?
+  linkedinUrl String?
+  email       String?
+  notes       String?
+  activities  Activity[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, accountId])
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactName String
+  persona     String?
+  type        ActivityType
+  outcome     Outcome
+  occurredAt  DateTime
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId, accountId, occurredAt])
+}
+
+model AIArtifact {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type           ArtifactType
+  title          String
+  inputsJson     Json
+  outputMarkdown String
+  model          String
+  createdAt      DateTime     @default(now())
+
+  @@index([userId, accountId, type, createdAt])
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId    String?
+  account      Account?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  title        String
+  dueDate      DateTime
+  status       TaskStatus @default(OPEN)
+  source       TaskSource @default(MANUAL)
+  metadataJson Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId, dueDate, status])
+}
+
+model EventLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType  String
+  properties Json
+  createdAt  DateTime @default(now())
+
+  @@index([userId, eventType, createdAt])
+}
